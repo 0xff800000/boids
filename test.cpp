@@ -16,9 +16,11 @@ const float MAX_SPEED = 100;
 class Boid {
     private:
         const float h = 20, w =10;
-        float visual_range = 100;
+        const float alignment_coef = 0.005, separation_coef = 0.005, cohesion_coef = 0.005;
+        float visual_range = 300;
         std::complex<float> position;
         std::complex<float> velocity;
+        std::complex<float> next_velocity;
         std::chrono::time_point<std::chrono::system_clock> last_call;
 
 
@@ -30,6 +32,7 @@ class Boid {
             float vy = MAX_SPEED * rand()  / RAND_MAX;
             position = std::complex<float>(x, y);
             velocity = std::complex<float>(vx, vy);
+            next_velocity = std::complex<float>(vx, vy);
 
             last_call = std::chrono::high_resolution_clock::now();
         }
@@ -66,14 +69,52 @@ class Boid {
         }
 
 
-        void compute(std::vector<Boid> & boids) {
-            
-            
+        void compute(std::vector<Boid> boids) {
+            next_velocity = velocity;
+            auto velocity_norm = std::complex<float>(
+                    cos(std::arg(velocity)),
+                    sin(std::arg(velocity))
+                    );
+
+            // Get close boids
+            std::vector<Boid> close_boids;
+            for(auto& boid: boids) {
+                float distance = std::norm(boid.position - this->position);
+                if(distance <= visual_range)
+                    close_boids.push_back(boid);
+            }
+            int nb_boids = close_boids.size();
+
+            // Separation
+
+
+            // Alignment
+            float avg_heading = 0;
+            for(auto& boid: close_boids) {
+                avg_heading += std::arg(boid.velocity) / nb_boids;
+            }
+            auto alignment_vector = std::complex<float>(cos(avg_heading), sin(avg_heading)) - velocity_norm;
+
+
+
+            // Cohesion
+            auto cg_flock = std::complex<float>(0.0, 0.0);
+            for(auto& boid: close_boids) {
+                cg_flock += boid.position;
+            }
+            cg_flock.real(cg_flock.real() / nb_boids);
+            cg_flock.imag(cg_flock.imag() / nb_boids);
+            float cohesion_heading = std::arg(cg_flock - this->position);
+            auto cohesion_vector = std::complex<float>(cos(cohesion_heading), sin(cohesion_heading));
+
+
+            next_velocity += (alignment_vector * alignment_coef) + (cohesion_vector * cohesion_coef);
 
         }
 
 
         void update() {
+            velocity = next_velocity;
             auto now = std::chrono::high_resolution_clock::now();
             std::chrono::duration<float> dt = now - last_call;
             last_call = now;
