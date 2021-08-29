@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -W -Wall -O3 -std=c++11 -g
+CFLAGS = -W -Wall -O3 -std=c++20 -g
 LDFLAGS = -LGLEW -lGL -lglut -lGLU -lstdc++
 EXEC = boid
 
