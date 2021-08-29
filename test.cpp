@@ -14,20 +14,24 @@ const float MAX_SPEED = 100;
 
 
 class Boid {
+    private:
+        const float h = 20, w =10;
+        float visual_range = 100;
+        std::complex<float> position;
+        std::complex<float> velocity;
+        std::chrono::time_point<std::chrono::system_clock> last_call;
+
+
     public:
         Boid() {
-            x = rand() % WIDTH;
-            y = rand() % HEIGHT;
+            float x = rand() % WIDTH;
+            float y = rand() % HEIGHT;
             float vx = MAX_SPEED * rand()  / RAND_MAX;
             float vy = MAX_SPEED * rand()  / RAND_MAX;
+            position = std::complex<float>(x, y);
             velocity = std::complex<float>(vx, vy);
 
             last_call = std::chrono::high_resolution_clock::now();
-        }
-
-
-        Boid(float x, float y) : x(x), y(y) {
-
         }
 
 
@@ -45,12 +49,12 @@ class Boid {
             v2 *= rotation;
             v3 *= rotation;
 
-            float p1_x = x + v1.real();
-            float p1_y = y + v1.imag();
-            float p2_x = x + v2.real();
-            float p2_y = y + v2.imag();
-            float p3_x = x + v3.real();
-            float p3_y = y + v3.imag();
+            float p1_x = position.real() + v1.real();
+            float p1_y = position.imag() + v1.imag();
+            float p2_x = position.real() + v2.real();
+            float p2_y = position.imag() + v2.imag();
+            float p3_x = position.real() + v3.real();
+            float p3_y = position.imag() + v3.imag();
 
             glBegin(GL_LINES);
             glVertex2i (p1_x,p1_y);
@@ -62,7 +66,9 @@ class Boid {
         }
 
 
-        void compute() {
+        void compute(std::vector<Boid> & boids) {
+            
+            
 
         }
 
@@ -71,25 +77,19 @@ class Boid {
             auto now = std::chrono::high_resolution_clock::now();
             std::chrono::duration<float> dt = now - last_call;
             last_call = now;
-            x += velocity.real() * dt.count();
-            y += velocity.imag() * dt.count();
+            position.real(position.real() + velocity.real() * dt.count());
+            position.imag(position.imag() + velocity.imag() * dt.count());
             
             // Clip on borders
-            if(x > WIDTH) x = WIDTH;
-            if(x < 0) x = 0;
-            if(y > HEIGHT) y = HEIGHT;
-            if(y < 0) y = 0;
+            if(position.real() > WIDTH) position.real(WIDTH);
+            if(position.real() < 0) position.real(0);
+            if(position.imag() > HEIGHT) position.imag(HEIGHT);
+            if(position.imag() < 0) position.imag(0);
 
             // Mirror vector if touching the border
-            if(x == WIDTH || x == 0) velocity.real(velocity.real() * -1);
-            if(y == HEIGHT || y == 0)velocity.imag(velocity.imag() * -1);
+            if(position.real() == WIDTH || position.real() == 0)  velocity.real(velocity.real() * -1);
+            if(position.imag() == HEIGHT || position.imag() == 0) velocity.imag(velocity.imag() * -1);
         }
-
-    private:
-        const float h = 20, w =10;
-        float x, y;
-        std::complex<float> velocity;
-        std::chrono::time_point<std::chrono::system_clock> last_call;
 };
 
 std::vector<Boid> boid_list;
@@ -98,7 +98,7 @@ std::vector<Boid> boid_list;
 void idle()
 {                      
     for(auto& boid: boid_list) {
-        boid.compute();
+        boid.compute(boid_list);
     }
     for(auto& boid: boid_list) {
         boid.update();
