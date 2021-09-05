@@ -3,4 +3,4 @@
 # TODO
     + Set colors to boids
     + Implement boid methods
-        + fix cohesion
+        + Implement separation from borders

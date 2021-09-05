@@ -6,26 +6,31 @@
 #include <iostream> 
 #include <complex> 
 #include <numbers> 
+#include <thread> 
 
-const int HEIGHT = 480;
-const int WIDTH = 640;
-const int NB_BOIDS = 20;
-const float MAX_SPEED = 100;
+const int HEIGHT = 1080;
+const int WIDTH = 1920;
+const int NB_BOIDS = 100;
+const float MAX_SPEED = 200;
 
 
 class Boid {
     private:
         const float h = 20, w =10;
-        const float alignment_coef = 0.005, separation_coef = 0.005, cohesion_coef = 0.005;
-        float visual_range = 300;
+        const float alignment_coef = 0.5, separation_coef = 0.9, cohesion_coef = 0.5;
+        const float randomized_coef = 1;
+        float visual_range = 1000;
         std::complex<float> position;
         std::complex<float> velocity;
         std::complex<float> next_velocity;
         std::chrono::time_point<std::chrono::system_clock> last_call;
+        int id;
 
 
     public:
         Boid() {
+            static int i=0;
+            id = i++;
             float x = rand() % WIDTH;
             float y = rand() % HEIGHT;
             float vx = MAX_SPEED * rand()  / RAND_MAX;
@@ -79,18 +84,19 @@ class Boid {
             // Get close boids
             std::vector<Boid> close_boids;
             for(auto& boid: boids) {
+                if(boid.id == this->id) continue;
                 float distance = std::norm(boid.position - this->position);
                 if(distance <= visual_range)
                     close_boids.push_back(boid);
             }
             int nb_boids = close_boids.size();
 
-            // Separation
 
 
             // Alignment
             float avg_heading = 0;
             for(auto& boid: close_boids) {
+                if(boid.id == this->id) continue;
                 avg_heading += std::arg(boid.velocity) / nb_boids;
             }
             auto alignment_vector = std::complex<float>(cos(avg_heading), sin(avg_heading)) - velocity_norm;
@@ -100,15 +106,48 @@ class Boid {
             // Cohesion
             auto cg_flock = std::complex<float>(0.0, 0.0);
             for(auto& boid: close_boids) {
+                if(boid.id == this->id) continue;
                 cg_flock += boid.position;
             }
-            cg_flock.real(cg_flock.real() / nb_boids);
-            cg_flock.imag(cg_flock.imag() / nb_boids);
+            if(nb_boids != 0) cg_flock.real(cg_flock.real() / nb_boids);
+            if(nb_boids != 0) cg_flock.imag(cg_flock.imag() / nb_boids);
+            //std::cout << cg_flock << std::endl;
             float cohesion_heading = std::arg(cg_flock - this->position);
             auto cohesion_vector = std::complex<float>(cos(cohesion_heading), sin(cohesion_heading));
 
 
-            next_velocity += (alignment_vector * alignment_coef) + (cohesion_vector * cohesion_coef);
+            // Separation
+            auto separation_vector = std::complex<float>(0.0, 0.0);
+            for(auto& boid: close_boids) {
+                if(boid.id == this->id) continue;
+                auto opposite = this->position - boid.position;
+                float distance = std::norm(opposite);
+                float weight = -(1/visual_range) * distance + 1;
+                separation_vector += std::polar<float>(1.0, std::arg(opposite)) * weight;
+            }
+            std::vector< std::complex<float> > borders;
+            borders.push_back(std::complex<float>(WIDTH, this->position.imag())); // Borders x
+            borders.push_back(std::complex<float>(0.0, this->position.imag())); // Borders x
+            borders.push_back(std::complex<float>(this->position.real(), HEIGHT)); // Borders y
+            borders.push_back(std::complex<float>(this->position.real(), 0.0)); // Borders y
+            for(auto& b: borders) {
+                auto opposite = this->position - b;
+                float distance = std::norm(opposite);
+                if(distance > visual_range) continue;
+                float weight = -(1/visual_range) * distance + 1 * 10;
+                separation_vector += std::polar<float>(1.0, std::arg(opposite)) * weight;
+            }
+
+            // Randomized
+            float randomized_heading = 2*std::numbers::pi * rand() / RAND_MAX;
+            auto randomized_vector = std::complex<float>(cos(randomized_heading), sin(randomized_heading));
+
+
+
+            next_velocity += (randomized_vector * randomized_coef);
+            next_velocity += (separation_vector * separation_coef);
+            if(nb_boids != 0) next_velocity += (alignment_vector * alignment_coef);
+            if(nb_boids != 0) next_velocity += (cohesion_vector * cohesion_coef);
 
         }
 
@@ -145,6 +184,8 @@ void idle()
         boid.update();
     }
     glutPostRedisplay();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    
 }
 
 void draw_update(void)
@@ -178,7 +219,7 @@ int main(int argc,char** argv)
 
 	glutInit(&argc,argv);
 	glutInitDisplayMode(GLUT_SINGLE);
-	glutInitWindowSize(640, 480);
+	glutInitWindowSize(WIDTH, HEIGHT);
 	glutCreateWindow("Randomly generated points");
 	glClearColor(0,0,0,0);
 	glClear(GL_COLOR_BUFFER_BIT);
